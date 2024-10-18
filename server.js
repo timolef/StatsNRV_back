@@ -2,7 +2,6 @@ const express = require('express');
 const cors = require('cors');
 const { createProxyMiddleware } = require('http-proxy-middleware');
 const app = express();
-const mysql = require('mysql2');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const axios = require('axios');
@@ -59,18 +58,7 @@ function calculatePlayerPerformance(playerStats) {
     .slice(0, 40);
 }
 
-// MySQL connection
-const db = mysql.createConnection({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASS,
-  database: process.env.DB_NAME,
-});
 
-db.connect((err) => {
-  if (err) throw err;
-  console.log('MySQL Connected...');
-});
 
 // Middleware
 app.use(cors());
