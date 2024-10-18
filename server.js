@@ -93,17 +93,6 @@ app.get('/top-players', async (req, res) => {
   }
 });
 
-// User registration
-app.post('/register', async (req, res) => {
-  const { username, password, email, is_premium } = req.body;
-  const hashedPassword = await bcrypt.hash(password, 10);
-
-  const sql = 'INSERT INTO users (username, password, email, is_premium, created_date) VALUES (?, ?, ?, ?, NOW())';
-  db.query(sql, [username, hashedPassword, email, is_premium], (err, result) => {
-    if (err) return res.status(500).json(err);
-    res.status(201).json({ message: 'User registered!' });
-  });
-});
 
 app.get('/matches-week', async (req, res) => {
     const todayDate = new Date().toISOString().slice(0, 10); // Format YYYY-MM-DD pour aujourd'hui
@@ -185,23 +174,6 @@ app.get('/matches-week', async (req, res) => {
     }
   });
 
-// User login
-app.post('/login', (req, res) => {
-  const { username, password } = req.body;
-  const sql = 'SELECT * FROM users WHERE username = ?';
-
-  db.query(sql, [username], async (err, results) => {
-    if (err) return res.status(500).json(err);
-    if (results.length === 0) return res.status(401).json({ message: 'User not found' });
-
-    const user = results[0];
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(401).json({ message: 'Invalid credentials' });
-
-    const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '1h' });
-    res.status(200).json({ token });
-  });
-});
 
 // CORS proxy for external API
 app.use('/api', createProxyMiddleware({
