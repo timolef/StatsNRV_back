@@ -162,6 +162,38 @@ app.get('/matches-week', async (req, res) => {
     }
   });
 
+  app.get('/score-matches', async (req, res) => {
+    try {
+      const nhlApiUrl = 'https://api-web.nhle.com/v1/score/now';
+      const response = await axios.get(nhlApiUrl);
+      console.log(response.data.games)
+      // Transformation des données pour le front-end
+      const matches = response.data.games.map(game => ({
+        gameDate: game.gameDate,
+        gameTime: game.gameTime,
+        teams: {
+          homeTeam: {
+            score: game.homeTeam.score,
+            name: game.homeTeam.name.default,
+            abbrev: game.homeTeam.abbrev,
+            logo: game.homeTeam.logo
+          },
+          awayTeam: {
+            score: game.awayTeam.score,
+            name: game.awayTeam.name.default,
+            abbrev: game.awayTeam.abbrev,
+            logo: game.awayTeam.logo
+          }
+        }
+      }));
+  
+      res.json(matches);
+    } catch (error) {
+      console.error('Error fetching live matches:', error);
+      res.status(500).send('Error fetching live matches');
+    }
+  });
+
   app.get('/api/player/:playerId/stats/:selectedSeason', async (req, res) => {
     const { playerId, selectedSeason } = req.params;
   
