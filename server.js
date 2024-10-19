@@ -167,10 +167,19 @@ app.get('/matches-week', async (req, res) => {
       const nhlApiUrl = 'https://api-web.nhle.com/v1/score/now';
       const response = await axios.get(nhlApiUrl);
       console.log(response.data.games)
+
+      const convertToUTC2 = (utcTime) => {
+        const date = new Date(utcTime); // Crée un objet Date à partir de l'heure UTC
+        return date.toLocaleTimeString('fr-FR', {
+          timeZone: 'Europe/Paris', // Fuseau horaire UTC+2 (Paris)
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+      };
       // Transformation des données pour le front-end
       const matches = response.data.games.map(game => ({
         gameDate: game.gameDate,
-        gameTime: game.gameTime,
+        gameTime: convertToUTC2(game.startTimeUTC),
         teams: {
           homeTeam: {
             score: game.homeTeam.score,
