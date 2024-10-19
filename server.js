@@ -8,55 +8,55 @@ const axios = require('axios');
 require('dotenv').config();
 
 function calculatePlayerPerformance(playerStats) {
-  const playersWithShots = playerStats.filter(p => p.gameLog.some(g => g.shots > 0)); // Ne garder que les joueurs avec des tirs dans leurs 5 derniers matchs
-
+  // Ne pas filtrer par nombre de tirs
   function scorePlayer(games) {
     function convertToSeconds(toi) {
       const [minutes, seconds] = toi.split(':').map(Number);  // Diviser en minutes et secondes, puis convertir en nombres
       return minutes * 60 + seconds;  // Convertir en secondes
+    }
+
+    // Calcul des sommes des statistiques pour les 5 derniers matchs
+    const totalShots = games.reduce((sum, g) => sum + g.shots, 0);
+    const totalGoals = games.reduce((sum, g) => sum + g.goals, 0);
+    const ppGoals = games.reduce((sum, g) => sum + (g.ppGoals || 0), 0);
+    const totalTOI = games.reduce((sum, g) => sum + convertToSeconds(g.toi || '0:00'), 0);  // Convertir TOI en secondes
+
+    // Si le temps de jeu est zéro, renvoyer un score de 0
+    if (totalTOI === 0) return 0;
+
+    // Normalisation par le temps de jeu
+    const shotsPerMinute = totalShots / (totalTOI / 60);   // Tirs par minute
+    const goalsPerMinute = totalGoals / (totalTOI / 60);   // Buts par minute
+    const ppGoalsPerMinute = ppGoals / (totalTOI / 60);    // Buts en Power Play par minute
+    console.log( "length : ", games.length)
+    // Influence de chaque statistique sur le score total
+    const goalShotRatio = goalsPerMinute / (shotsPerMinute || 1);  // Ratio buts/tirs par minute (évite la division par 0)
+    const ppInfluence = ppGoalsPerMinute;            // Influence du Power Play ajustée par minute
+    const toiInfluence = totalTOI / (1500 * games.length);  // Influence du temps de jeu moyen
+    console.log("influ : ", toiInfluence)
+    const recentGoals = goalsPerMinute;                    // Buts récents par minute
+    const shootingOpportunities = shotsPerMinute; // Opportunités de tir par minute
+
+    // Calcul du score ajusté
+    const score = goalShotRatio * 0.7 +
+                  ppInfluence * 0.5 +
+                  toiInfluence * 0.4 +
+                  recentGoals * 0.4 +
+                  shootingOpportunities * 0.5;
+
+    return score;
   }
 
-  // Calcul des sommes des statistiques pour les 5 derniers matchs
-  const totalShots = games.reduce((sum, g) => sum + g.shots, 0);
-  const totalGoals = games.reduce((sum, g) => sum + g.goals, 0);
-  const ppGoals = games.reduce((sum, g) => sum + (g.ppGoals || 0), 0);
-  const totalTOI = games.reduce((sum, g) => sum + convertToSeconds(g.toi || '0:00'), 0);  // Convertir TOI en secondes
-
-  // Si aucun tir n'a été tenté ou si le temps de jeu est zéro, renvoyer un score de 0
-  if (totalShots === 0 || totalTOI === 0) return 0;
-
-  // Normalisation par le temps de jeu
-  const shotsPerMinute = totalShots / (totalTOI / 60);   // Tirs par minute
-  const goalsPerMinute = totalGoals / (totalTOI / 60);   // Buts par minute
-  const ppGoalsPerMinute = ppGoals / (totalTOI / 60);    // Buts en Power Play par minute
-
-  // Influence de chaque statistique sur le score total
-  const goalShotRatio = goalsPerMinute / shotsPerMinute;  // Ratio buts/tirs par minute
-  const ppInfluence = ppGoalsPerMinute * 0.8;            // Influence du Power Play ajustée par minute
-  const toiInfluence = totalTOI / (1500 * games.length);  // Influence du temps de jeu moyen
-  const recentGoals = goalsPerMinute;                    // Buts récents par minute
-  const shootingOpportunities = shotsPerMinute / 100;    // Opportunités de tir par minute
-
-  // Calcul du score ajusté
-  const score = goalShotRatio * 0.5 +
-                ppInfluence * 0.3 +
-                toiInfluence * 0.2 +
-                recentGoals * 0.2 +
-                shootingOpportunities * 0.3;
-  
-  console.log("score = ", score);
-  return score;
-  }
-
-  playersWithShots.forEach(player => {
-    const recentGames = player.gameLog;  // On utilise maintenant uniquement les 5 derniers matchs déjà récupérés
+  playerStats.forEach(player => {
+    const recentGames = player.gameLog.slice(-5);  // Toujours prendre les 5 derniers matchs, peu importe les tirs
     player.score = scorePlayer(recentGames);
   });
 
-  return playersWithShots
+  return playerStats
     .sort((a, b) => b.score - a.score)
     .slice(0, 40);
 }
+
 
 
 
@@ -184,7 +184,9 @@ app.get('/matches-week', async (req, res) => {
       // Transformation des données pour le front-end
       const matches = response.data.games.map(game => ({
         gameDate: game.gameDate,
+        gameId: game.id,
         gameTime: convertToUTC2(game.startTimeUTC),
+        gameState: game.gameState,
         teams: {
           homeTeam: {
             score: game.homeTeam.score,
