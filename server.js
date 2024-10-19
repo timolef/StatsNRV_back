@@ -150,9 +150,14 @@ app.get('/matches-week', async (req, res) => {
         goalsFor: team.goalsFor,
         goalsForPG: team.goalsForPerGame,
         goalsAgainst: team.goalsAgainst,
+        shotsForPG: team.shotsForPerGame,
+        shotsAgainstPG: team.shotsAgainstPerGame,
         goalsAgainstPG: team.goalsAgainstPerGame,
         wins: team.wins,
+        regulationWins: team.winsInRegulation,
+        shootoutWins: team.winsInShootout,
         losses: team.losses,
+        otLosses: team.otLosses,
         points: team.points,
       }));
       res.json(teamStats);
