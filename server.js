@@ -180,10 +180,11 @@ app.get('/matches-week', async (req, res) => {
 
   app.get('/score-matches', async (req, res) => {
     try {
-      const nhlApiUrl = 'https://api-web.nhle.com/v1/score/now';
+      const date = req.query.date; // Récupérer la date depuis les paramètres de la requête
+      const nhlApiUrl = `https://api-web.nhle.com/v1/score/${date}`; // Utiliser la date dans l'URL
       const response = await axios.get(nhlApiUrl);
-      console.log(response.data.games)
-
+      console.log(response.data.games);
+  
       const convertToUTC2 = (utcTime) => {
         const date = new Date(utcTime); // Crée un objet Date à partir de l'heure UTC
         return date.toLocaleTimeString('fr-FR', {
@@ -192,6 +193,7 @@ app.get('/matches-week', async (req, res) => {
           minute: '2-digit',
         });
       };
+  
       // Transformation des données pour le front-end
       const matches = response.data.games.map(game => ({
         gameDate: game.gameDate,
