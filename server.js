@@ -8,7 +8,6 @@ const axios = require('axios');
 require('dotenv').config();
 
 function calculatePlayerPerformance(playerStats) {
-  // Ne pas filtrer par nombre de tirs
   function scorePlayer(games) {
     function convertToSeconds(toi) {
       const [minutes, seconds] = toi.split(':').map(Number);  // Diviser en minutes et secondes, puis convertir en nombres
@@ -18,44 +17,41 @@ function calculatePlayerPerformance(playerStats) {
     // Calcul des sommes des statistiques pour les 5 derniers matchs
     const totalShots = games.reduce((sum, g) => sum + g.shots, 0);
     const totalGoals = games.reduce((sum, g) => sum + g.goals, 0);
-    const ppGoals = games.reduce((sum, g) => sum + (g.ppGoals || 0), 0);
     const totalTOI = games.reduce((sum, g) => sum + convertToSeconds(g.toi || '0:00'), 0);  // Convertir TOI en secondes
 
-    // Si le temps de jeu est zéro, renvoyer un score de 0
+    // Ajouter une pénalité si le joueur a joué mais n'a ni tiré ni marqué
+    const playedWithoutShotOrGoal = games.reduce((count, g) => {
+      return count + (g.shots === 0 && g.goals === 0 ? 1 : 0);  // Compter les matchs où le joueur n'a ni tiré ni marqué
+    }, 0);
+
+    // Si le joueur n'a pas joué ou n'a aucune donnée valable, renvoyer un score de 0
     if (totalTOI === 0) return 0;
 
-    // Normalisation par le temps de jeu
-    const shotsPerMinute = totalShots / (totalTOI / 60);   // Tirs par minute
-    const goalsPerMinute = totalGoals / (totalTOI / 60);   // Buts par minute
-    const ppGoalsPerMinute = ppGoals / (totalTOI / 60);    // Buts en Power Play par minute
-    console.log( "length : ", games.length)
-    // Influence de chaque statistique sur le score total
-    const goalShotRatio = goalsPerMinute / (shotsPerMinute || 1);  // Ratio buts/tirs par minute (évite la division par 0)
-    const ppInfluence = ppGoalsPerMinute;            // Influence du Power Play ajustée par minute
-    const toiInfluence = totalTOI / (1500 * games.length);  // Influence du temps de jeu moyen
-    console.log("influ : ", toiInfluence)
-    const recentGoals = goalsPerMinute;                    // Buts récents par minute
-    const shootingOpportunities = shotsPerMinute; // Opportunités de tir par minute
+    // Normalisation par le temps de jeu : ratio de buts par tirs
+    const goalsPerShot = totalShots > 0 ? totalGoals / totalShots : 0;  // Buts par tir, éviter division par 0
+    const toiFactor = totalTOI / (60 * games.length);  // Temps de jeu moyen par minute sur les 5 matchs
 
-    // Calcul du score ajusté
-    const score = goalShotRatio * 0.7 +
-                  ppInfluence * 0.5 +
-                  toiInfluence * 0.4 +
-                  recentGoals * 0.4 +
-                  shootingOpportunities * 0.5;
+    // Pénalisation basée sur le nombre de matchs joués sans tir ou but
+    const penalty = playedWithoutShotOrGoal / games.length;  // Ratio de matchs sans performance
 
-    return score;
+    // Calcul du score basé sur le ratio de buts par tirs, ajusté par le temps de jeu moyen et la pénalité
+    const score = (goalsPerShot * toiFactor) - penalty;  // Le score est pénalisé si le joueur n'a pas tiré ou marqué
+
+    return score > 0 ? score/10 : 0;  // Empêcher les scores négatifs
   }
 
+  // Calculer le score de chaque joueur sur la base des 5 derniers matchs
   playerStats.forEach(player => {
-    const recentGames = player.gameLog.slice(-5);  // Toujours prendre les 5 derniers matchs, peu importe les tirs
+    const recentGames = player.gameLog.slice(0,5);  // Prendre les 5 derniers matchs
     player.score = scorePlayer(recentGames);
   });
 
+  // Retourner les 50 meilleurs joueurs triés par score
   return playerStats
     .sort((a, b) => b.score - a.score)
     .slice(0, 50);
 }
+
 
 
 
