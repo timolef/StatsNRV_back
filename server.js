@@ -105,6 +105,22 @@ app.get('/match/:id', async (req, res) => {
   }
 });
 
+app.get('/rosters/:matchId', async (req, res) => {
+  const matchId = req.params.matchId;
+  
+  try {
+    // Utilise l'API pour récupérer les détails du match
+    const response = await axios.get(`https://api-web.nhle.com/v1/gamecenter/${matchId}/play-by-play`);
+    const matchDetails = response.data.rosterSpots;
+    
+    // Renvoie les données du match
+    res.status(200).json(matchDetails);
+  } catch (error) {
+    console.error(`Erreur lors de la récupération des détails du match avec id ${matchId}:`, error.message);
+    res.status(500).json({ error: 'Erreur lors de la récupération des détails du match' });
+  }
+});
+
 app.get('/matches-week', async (req, res) => {
     const todayDate = new Date().toISOString().slice(0, 10); // Format YYYY-MM-DD pour aujourd'hui
     try {
