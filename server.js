@@ -255,27 +255,35 @@ app.get('/matches-week', async (req, res) => {
     try {
       const { email, password, pseudo } = req.body;
   
-    // Vérifier si l'utilisateur existe déjà
-    db.query('SELECT * FROM users WHERE email = ?', [email], async (err, result) => {
-      if (result.length > 0) {
-        return res.status(400).json({ message: 'Utilisateur déjà existant' });
-      }
-  
-      // Hash du mot de passe
-      const hashedPassword = await bcrypt.hash(password, 10);
-  
-      // Insérer l'utilisateur dans la base de données
-      db.query('INSERT INTO users (email, password, pseudo) VALUES (?, ?, ?)', [email, hashedPassword, pseudo], (err, result) => {
+      // Vérifier si l'email ou le pseudo existe déjà
+      db.query('SELECT * FROM users WHERE email = ? OR pseudo = ?', [email, pseudo], async (err, result) => {
         if (err) {
-          return res.status(500).json({ message: 'Erreur lors de l\'inscription' });
+          return res.status(500).json({ message: 'Erreur lors de la vérification' });
         }
-        res.json({ message: 'User created' });
+        if (result.length > 0) {
+          // Vérifier si c'est l'email ou le pseudo qui est déjà pris
+          if (result[0].email === email) {
+            return res.status(400).json({ message: 'Email déjà utilisé' });
+          } else if (result[0].pseudo === pseudo) {
+            return res.status(400).json({ message: 'Pseudo déjà utilisé' });
+          }
+        }
+  
+        // Hash du mot de passe
+        const hashedPassword = await bcrypt.hash(password, 10);
+  
+        // Insérer l'utilisateur dans la base de données
+        db.query('INSERT INTO users (email, password, pseudo) VALUES (?, ?, ?)', [email, hashedPassword, pseudo], (err, result) => {
+          if (err) {
+            return res.status(500).json({ message: 'Erreur lors de l\'inscription' });
+          }
+          res.json({ message: 'User created' });
+        });
       });
-    });
     } catch (error) {
-      console.error(error)
+      console.error(error);
+      res.status(500).json({ message: 'Une erreur est survenue' });
     }
-    
   });
   
   // Route de connexion
