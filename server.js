@@ -5,8 +5,40 @@ const app = express();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const axios = require('axios');
+const mysql = require('mysql2');
 require('dotenv').config();
+const db = mysql.createConnection({
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASS,
+  database: process.env.DB_NAME,
+  port: process.env.DB_PORT
+});
 
+function authenticateToken(req, res, next) {
+  const token = req.headers['authorization'];
+  
+  if (!token) {
+    return res.status(401).json({ message: 'Accès refusé : Aucun token fourni' });
+  }
+
+  jwt.verify(token.split(' ')[1], JWT_SECRET, (err, user) => {
+    if (err) {
+      return res.status(403).json({ message: 'Token invalide' });
+    }
+    req.user = user;
+    next();
+  });
+}
+
+db.connect(err => {
+  if (err) {
+    console.error('Erreur de connexion à la base de données:', err);
+    return;
+  }
+  console.log('Connecté à la base de données MySQL');
+});
+const JWT_SECRET = process.env.JWT_SECRET
 function calculatePlayerPerformance(playerStats) {
   function scorePlayer(games) {
     function convertToSeconds(toi) {
@@ -59,6 +91,31 @@ function calculatePlayerPerformance(playerStats) {
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+
+app.get('/api/user-info', authenticateToken, (req, res) => {
+  const userId = req.user.id;
+
+try {
+    // Requête à la base de données pour récupérer les infos de l'utilisateur
+  db.query('SELECT email, is_premium, created_date FROM users WHERE id = ?', [userId], (err, result) => {
+    if (err) {
+      return res.status(500).json({ message: 'Erreur lors de la récupération des informations utilisateur' });
+    }
+
+    if (result.length === 0) {
+      return res.status(404).json({ message: 'Utilisateur non trouvé' });
+    }
+
+    const userInfo = result[0];
+    res.json({userInfo});
+  });
+} catch (error) {
+    console.log(error)
+}
+
+  
+});
 
 app.get('/top-players', async (req, res) => {
   try {
@@ -192,6 +249,57 @@ app.get('/matches-week', async (req, res) => {
       console.error('Error fetching team stats:', error);
       res.status(500).json({ message: 'Error fetching team stats' });
     }
+  });
+
+  app.post('/api/register', async (req, res) => {
+    try {
+      const { email, password, pseudo } = req.body;
+  
+    // Vérifier si l'utilisateur existe déjà
+    db.query('SELECT * FROM users WHERE email = ?', [email], async (err, result) => {
+      if (result.length > 0) {
+        return res.status(400).json({ message: 'Utilisateur déjà existant' });
+      }
+  
+      // Hash du mot de passe
+      const hashedPassword = await bcrypt.hash(password, 10);
+  
+      // Insérer l'utilisateur dans la base de données
+      db.query('INSERT INTO users (email, password, pseudo) VALUES (?, ?, ?)', [email, hashedPassword, pseudo], (err, result) => {
+        if (err) {
+          return res.status(500).json({ message: 'Erreur lors de l\'inscription' });
+        }
+        res.json({ message: 'User created' });
+      });
+    });
+    } catch (error) {
+      console.error(error)
+    }
+    
+  });
+  
+  // Route de connexion
+  app.post('/api/login', (req, res) => {
+    const { email, password } = req.body;
+  
+    // Vérifier si l'utilisateur existe
+    db.query('SELECT * FROM users WHERE email = ?', [email], async (err, result) => {
+      if (err || result.length === 0) {
+        return res.status(400).json({ message: 'Email ou mot de passe incorrect' });
+      }
+  
+      const user = result[0];
+  
+      // Vérifier le mot de passe
+      const isMatch = await bcrypt.compare(password, user.password);
+      if (!isMatch) {
+        return res.status(400).json({ message: 'Email ou mot de passe incorrect' });
+      }
+  
+      // Créer un token JWT
+      const token = jwt.sign({ id: user.id, email: user.email,pseudo: user.pseudo, is_premium: user.is_premium }, JWT_SECRET, { expiresIn: '1h' });
+      res.json({ token });
+    });
   });
 
   app.get('/score-matches', async (req, res) => {
